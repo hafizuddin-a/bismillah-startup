@@ -89,3 +89,29 @@ public class GreetGateTests
         Assert.True(gate.ShouldGreet(T0.AddHours(2).AddSeconds(5), false, true));
     }
 }
+
+public class GreetGateDesktopTests
+{
+    private static readonly DateTime T0 = new(2026, 11, 6, 9, 0, 0);
+
+    [Fact]
+    public void WaitsWhileTheDesktopIsStillLoadingOrTheStartMenuIsOpen()
+    {
+        var gate = new GreetGate();
+        gate.Woke(T0);
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(10), false, true, deskReady: false));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(10.2), false, true));                    // ready again: settle first
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(14.5), false, true));
+    }
+
+    [Fact]
+    public void ALaterWakeTimeDelaysTheGreeting()
+    {
+        // used at sign-in, where the app starts while Windows is still busy
+        var gate = new GreetGate();
+        gate.Woke(T0.AddSeconds(6));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(9), false, true));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(9.9), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(10.1), false, true));
+    }
+}

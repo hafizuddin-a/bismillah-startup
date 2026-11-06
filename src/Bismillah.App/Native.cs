@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Bismillah;
@@ -41,14 +42,58 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool UnregisterPowerSettingNotification(IntPtr handle);
     [DllImport("shcore.dll")] public static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint x, out uint y);
 
-    /// <summary>True while the lock screen (or another secure desktop) has the input: nothing of ours can be seen then.</summary>
-    public static bool IsSessionLocked()
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr FindWindow(string className, string? title);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+    /// <summary>
+    /// True while the lock screen, the sign-in screen (password, PIN, fingerprint) or another secure desktop is up:
+    /// nothing of ours can be seen then. Two independent signals, because either alone can miss a state: the input
+    /// desktop is not ours to open, or Windows' sign-in UI (LogonUI) is running in this session.
+    /// </summary>
+    public static bool IsSessionLocked() => InputDesktopIsSecure() || LogonUiRunning();
+
+    private static bool InputDesktopIsSecure()
     {
         IntPtr desktop = OpenInputDesktop(0, false, DESKTOP_SWITCHDESKTOP);
         if (desktop == IntPtr.Zero) return true;
         CloseDesktop(desktop);
         return false;
     }
+
+    private static bool LogonUiRunning()
+    {
+        try
+        {
+            int session = Process.GetCurrentProcess().SessionId;
+            foreach (var process in Process.GetProcessesByName("LogonUI"))
+            {
+                using (process) { try { if (process.SessionId == session) return true; } catch { } }
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>The taskbar exists, so the desktop has finished loading (it doesn't yet while Windows is still signing in).</summary>
+    public static bool ShellReady => FindWindow("Shell_TrayWnd", null) != IntPtr.Zero;
+
+    /// <summary>The program of the window the user is in, e.g. "StartMenuExperienceHost" while the Start menu is open.</summary>
+    public static string ForegroundProgram()
+    {
+        try
+        {
+            GetWindowThreadProcessId(GetForegroundWindow(), out uint pid);
+            if (pid == 0) return "";
+            using var process = Process.GetProcessById((int)pid);
+            return process.ProcessName;
+        }
+        catch { return ""; }
+    }
+
+    /// <summary>True while the Start menu or search is open: a popup centred on the screen would be half hidden behind it.</summary>
+    public static bool StartMenuOpen() =>
+        ForegroundProgram() is "StartMenuExperienceHost" or "SearchHost" or "SearchApp" or "ShellExperienceHost";
 
     /// <summary>The scale factor (1.0 = 100%) of the monitor containing this screen's centre.</summary>
     public static double ScaleOf(System.Windows.Forms.Screen screen)

@@ -19,6 +19,7 @@ internal sealed class AppHost : IDisposable
     private readonly Action _quit;
 
     private readonly GreetGate _greet = new();
+    private string _lastGreetState = "";
     private readonly DispatcherTimer _greetTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
 
     // menu items that change with the settings, kept so the open menu can be updated in place
@@ -68,7 +69,7 @@ internal sealed class AppHost : IDisposable
         // After an automatic update the app reopens itself quietly. Opened by hand it greets you straight away; started
         // at sign-in it waits for the desktop to be ready first (Windows starts these apps while it is still setting up).
         _greetTimer.Tick += (_, _) => PollGreeting();
-        if (atLogin) Wake("signed in");
+        if (atLogin) Wake("signed in", extraWait: TimeSpan.FromSeconds(6));      // Windows is still busy setting up the desktop
         else if (!afterUpdate) ShowGreeting();
         StartupRegistration.KeepCurrent();
         _updater.StartAutomaticChecks();
@@ -99,9 +100,9 @@ internal sealed class AppHost : IDisposable
     }
 
     /// <summary>Waits for the lock screen to be gone (see <see cref="GreetGate"/>) and then writes the bismillah.</summary>
-    private void Wake(string why)
+    private void Wake(string why, TimeSpan extraWait = default)
     {
-        _greet.Woke(DateTime.Now);
+        _greet.Woke(DateTime.Now + extraWait);
         _greetTimer.Start();
         Log.Write($"greeting pending ({why})");
     }
@@ -109,7 +110,10 @@ internal sealed class AppHost : IDisposable
     private void PollGreeting()
     {
         bool locked = Native.IsSessionLocked();
-        if (_greet.ShouldGreet(DateTime.Now, locked, _wake.DisplayOn))
+        bool shell = Native.ShellReady, startMenu = Native.StartMenuOpen();
+        string state = $"locked={locked} display={_wake.DisplayOn} taskbar={shell} startMenu={startMenu} in={Native.ForegroundProgram()}";
+        if (state != _lastGreetState) { _lastGreetState = state; Log.Write("waiting: " + state); }
+        if (_greet.ShouldGreet(DateTime.Now, locked, _wake.DisplayOn, deskReady: shell && !startMenu))
         {
             Log.Write("greeting now");
             ShowGreeting(markGreeted: false);

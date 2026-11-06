@@ -43,12 +43,15 @@ public sealed class GreetGate
         _unlockedSince = null;
     }
 
-    /// <summary>One look at the world. Returns true exactly once per wake, when the popup should be shown now.</summary>
-    public bool ShouldGreet(DateTime now, bool locked, bool displayOn)
+    /// <summary>
+    /// One look at the world. Returns true exactly once per wake, when the popup should be shown now.
+    /// <paramref name="deskReady"/> is false while the desktop is still loading or the Start menu is open.
+    /// </summary>
+    public bool ShouldGreet(DateTime now, bool locked, bool displayOn, bool deskReady = true)
     {
         if (!Pending) return false;
         if (locked) { Locked(); return false; }
-        if (!displayOn) { _unlockedSince = null; _lastWake = now; return false; }      // it settles again once the display is back
+        if (!displayOn || !deskReady) { _unlockedSince = null; _lastWake = now; return false; }      // it settles again once the display is back
 
         _unlockedSince ??= now;
         bool ready = _sawLock
