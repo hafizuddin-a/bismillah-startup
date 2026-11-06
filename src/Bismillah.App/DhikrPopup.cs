@@ -62,7 +62,7 @@ internal sealed class DhikrShape : FrameworkElement
 internal sealed class DhikrView : Grid
 {
     public readonly DhikrShape Shape = new();
-    private readonly System.Windows.Shapes.Path _label;
+    private readonly GlyphOutline _label;
     private readonly Grid _labelHost = new() { IsHitTestVisible = false };
 
     public DhikrView(Dhikr phrase)
@@ -82,16 +82,7 @@ internal sealed class DhikrView : Grid
         double lineHeight = (outline.Ascent + outline.Descent) * scale;
         double x = (Width - outline.Width * scale) / 2;
         double baseline = DhikrShape.TopInset + (DhikrShape.TextAreaHeight - lineHeight) / 2 + outline.Ascent * scale;
-        _label = new System.Windows.Shapes.Path
-        {
-            Data = geometry,
-            Fill = Brushes.White,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-            RenderTransform = new MatrixTransform(scale, 0, 0, scale, x, baseline),
-            IsHitTestVisible = false,
-            Opacity = 0,
-        };
+        _label = new GlyphOutline(geometry, new Matrix(scale, 0, 0, scale, x, baseline)) { Opacity = 0 };
         _labelHost.Children.Add(_label);
         Children.Add(_labelHost);
         System.Windows.Automation.AutomationProperties.SetName(this, phrase.Reading);
@@ -109,6 +100,27 @@ internal sealed class DhikrView : Grid
             _labelHost.Clip = Shape.ShapeGeometry;
             _label.Opacity = Math.Clamp((Shape.Progress - 0.55) / 0.35, 0, 1);       // the text arrives once the shape is mostly open
         }
+    }
+}
+
+/// <summary>Draws glyph outlines at a transform. (A Path would clip anything above its own top edge, which is where the letters are.)</summary>
+internal sealed class GlyphOutline : FrameworkElement
+{
+    private readonly Geometry _geometry;
+    private readonly Matrix _matrix;
+
+    public GlyphOutline(Geometry geometry, Matrix matrix)
+    {
+        _geometry = geometry;
+        _matrix = matrix;
+        IsHitTestVisible = false;
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        dc.PushTransform(new MatrixTransform(_matrix));
+        dc.DrawGeometry(Brushes.White, null, _geometry);
+        dc.Pop();
     }
 }
 
