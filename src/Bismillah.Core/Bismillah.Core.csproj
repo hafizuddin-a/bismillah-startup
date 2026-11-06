@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Data\bismillah.json" LogicalName="bismillah.json" />
+    <EmbeddedResource Include="Data\dhikr.json" LogicalName="dhikr.json" />
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
   </ItemGroup>
 </Project>

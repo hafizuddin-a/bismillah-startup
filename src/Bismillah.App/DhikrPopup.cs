@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -63,7 +62,7 @@ internal sealed class DhikrShape : FrameworkElement
 internal sealed class DhikrView : Grid
 {
     public readonly DhikrShape Shape = new();
-    private readonly TextBlock _label;
+    private readonly System.Windows.Shapes.Path _label;
 
     public DhikrView(Dhikr phrase)
     {
@@ -72,19 +71,23 @@ internal sealed class DhikrView : Grid
         Shape.Effect = new DropShadowEffect { BlurRadius = 24, ShadowDepth = 6, Direction = 270, Opacity = 0.5, Color = Colors.Black };
         Children.Add(Shape);
 
-        _label = new TextBlock
+        // The text is drawn from baked glyph outlines (Geeza Pro, like the Mac app), not from a font Windows may not have.
+        var set = DhikrOutlineSet.Shared;
+        var outline = set.For(phrase);
+        var geometry = Geometry.Parse("F1 " + outline.Path);
+        geometry.Freeze();
+        // 30 pt, or smaller if a longer phrase wouldn't fit the open shape with some air around it
+        double scale = Math.Min(30 / set.FontSize, (DhikrShape.OpenWidth - 56) / outline.Width);
+        double lineHeight = (outline.Ascent + outline.Descent) * scale;
+        double x = (Width - outline.Width * scale) / 2;
+        double baseline = DhikrShape.TopInset + (DhikrShape.TextAreaHeight - lineHeight) / 2 + outline.Ascent * scale;
+        _label = new System.Windows.Shapes.Path
         {
-            Text = phrase.Arabic,
-            Foreground = Brushes.White,
-            FontFamily = new FontFamily("Segoe UI, Sakkal Majalla, Arial"),
-            FontSize = FitFontSize(phrase.Arabic),
-            FlowDirection = FlowDirection.RightToLeft,
-            TextAlignment = TextAlignment.Center,
-            Width = DhikrShape.OpenWidth,
-            HorizontalAlignment = HorizontalAlignment.Center,
+            Data = geometry,
+            Fill = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(0, DhikrShape.TopInset + (DhikrShape.TextAreaHeight - 44) / 2, 0, 0),
-            Height = 44,
+            RenderTransform = new MatrixTransform(scale, 0, 0, scale, x, baseline),
             IsHitTestVisible = false,
             Opacity = 0,
         };
@@ -93,29 +96,18 @@ internal sealed class DhikrView : Grid
         Progress = 0;
     }
 
-    /// <summary>30 pt, or smaller if a longer phrase wouldn't fit the open shape with some air around it.</summary>
-    private static double FitFontSize(string text)
-    {
-        double Width(double size)
-        {
-            var formatted = new FormattedText(text, CultureInfo.GetCultureInfo("ar"), FlowDirection.RightToLeft,
-                new Typeface(new FontFamily("Segoe UI, Sakkal Majalla, Arial"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
-                size, Brushes.White, 1.0);
-            return formatted.WidthIncludingTrailingWhitespace;
-        }
-        double fit = DhikrShape.OpenWidth - 56, natural = Width(30);
-        return natural > fit ? Math.Floor(30 * fit / natural) : 30;
-    }
-
     public double Progress
     {
         get => Shape.Progress;
         set
         {
             Shape.Progress = value;
-            // the text is clipped to the shape (in the label's own coordinates), so it never spills out while the shape is still opening
+            // the text is clipped to the shape, so it never spills out while the shape is still opening.
+            // (The clip is in the path's own coordinates, so it goes through the inverse of the text's transform.)
             var clip = Shape.ShapeGeometry.Clone();
-            clip.Transform = new TranslateTransform(-DhikrShape.ShadowMargin, -(DhikrShape.TopInset + (DhikrShape.TextAreaHeight - 44) / 2));
+            var matrix = ((MatrixTransform)_label.RenderTransform).Matrix;
+            matrix.Invert();
+            clip.Transform = new MatrixTransform(matrix);
             _label.Clip = clip;
             _label.Opacity = Math.Clamp((Shape.Progress - 0.55) / 0.35, 0, 1);       // the text arrives once the shape is mostly open
         }

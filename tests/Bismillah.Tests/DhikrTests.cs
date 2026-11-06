@@ -46,6 +46,21 @@ public class DhikrPlanTests
     }
 
     [Fact]
+    public void EveryPhraseHasItsGlyphOutlines()
+    {
+        var outlines = DhikrOutlineSet.Shared;
+        Assert.Equal(100, outlines.FontSize);
+        foreach (var phrase in Dhikr.Phrases)
+        {
+            var outline = outlines.For(phrase);
+            Assert.StartsWith("M", outline.Path);
+            Assert.True(outline.Path.Length > 5000);
+            Assert.InRange(outline.Width, 400, 900);
+            Assert.True(outline.Ascent > 50 && outline.Descent > 10);
+        }
+    }
+
+    [Fact]
     public void ThereAreThreePhrasesAndNeverTheSameTwiceInARow()
     {
         Assert.Equal(3, Dhikr.Phrases.Count);
