@@ -27,10 +27,10 @@
   <sub><b>When your PC wakes:</b> the bismillah is written out. &nbsp;·&nbsp; <b>Through the day:</b> a dhikr opens out of the top of the screen.</sub>
 </p>
 
-> **Preview.** This is the Windows version of [Bismillah for Mac](https://github.com/hafizuddin-a/bismillah-menubar).
-> The animation, the popups, the menu and the updater are tested on a real Windows machine, but waking from sleep, the
-> lock screen and multiple monitors are still waiting for a real-PC test. If something misbehaves, please
-> [open an issue](../../issues).
+> This is the Windows version of [Bismillah for Mac](https://github.com/hafizuddin-a/bismillah-menubar). It has been
+> tested on a real Windows PC (waking from sleep and the lid, fingerprint unlock, restarting, updating) and on a Windows
+> build machine on every change. Multiple monitors with different scaling have only been tested on the build machine,
+> so if something misbehaves, please [open an issue](../../issues).
 
 Bismillah is a small tray app for Windows. It shows a black popup in the middle of the screen and writes out
 بسم الله الرحمن الرحيم stroke by stroke, the way Apple's "hello" animation is drawn.
@@ -88,6 +88,9 @@ Click the icon in the tray:
 | Quit Bismillah  | Quits the app |
 | Sincerely, @madebyhafiz | Opens the maker's Instagram |
 
+The menu stays open while you change settings (the dhikr count and hours, Launch at Login, Show on All Screens, Update
+Automatically), so you can change several at once. It closes for the actions.
+
 The popup fades away by itself a couple of seconds after it finishes writing. Click it or press Esc to dismiss
 it sooner.
 
@@ -134,6 +137,10 @@ finish first.
 
 - It can't appear above the lock screen. If your PC locks while it sleeps, the popup waits and shows right
   after you sign in.
+- At sign-in, Windows itself holds startup apps back for several seconds (longer with many of them), so the greeting
+  appears a little after your desktop does. Bismillah can't speed that part up.
+- It can't appear above the Start menu: Windows draws that above all ordinary windows. If the Start menu or search is
+  open when the popup is due, it waits until it's closed.
 - It can't appear over a game or video running in exclusive full screen.
 - The app isn't code-signed (that needs a paid certificate), so downloading it through a browser triggers SmartScreen
   (see Install). The PowerShell install above avoids this.
@@ -160,6 +167,12 @@ How it fits together:
 - `tools/make_gifs.sh`: makes the two animations at the top of this page from frames that CI draws with the app's own renderer.
 - Every push is built and tested on a Windows machine by GitHub Actions, which also starts the real popup windows,
   photographs the screen, and runs a full update (a signed release installs itself, a forged one is refused).
+
+## If something goes wrong
+
+Bismillah keeps a small log at `%APPDATA%\Bismillah\bismillah.log` (paste that into the address bar of File Explorer).
+It records when the app starts, what it was waiting for before showing a popup, and any error, so it's the first
+thing to attach to an [issue](../../issues).
 
 ## Uninstall
 

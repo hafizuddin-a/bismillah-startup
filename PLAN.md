@@ -75,20 +75,20 @@ Phases 1 to 6 can all be built and unit-tested without a Windows PC. Phase 7 is 
 - WPF has no true transparent click-through for the area around the popup, so the window is sized to the popup itself.
 - Windows power events differ by laptop (Modern Standby vs S3 sleep); the test on the user's PC covers only theirs.
 
-## Status (6 Nov 2026)
+## Status (7 Nov 2026)
 
 | Phase | State |
 |---|---|
 | 0 Repo | Done: https://github.com/hafizuddin-a/bismillah-startup |
 | 1 Data and animation | Done. Frames drawn by Skia (on the Mac) and by WPF (on a Windows runner) match the Mac app's |
-| 2 Popup and tray | Done. Real popup windows photographed on a Windows runner, animated, on one screen |
-| 3 Wake and unlock | Written (resume, display-on, session unlock, lock detection). **Not testable without a real PC** |
-| 4 Dhikr | Done and unit-tested (scheduler on a fake clock). Popup photographed on a Windows runner |
-| 5 Settings and startup | Done. Launch at Login switched on and off in the real registry on a runner |
-| 6 Install and updates | Done. A signed release installing itself in place, and a forged one refused, tested on a runner. `get.ps1` written but **not run yet** (needs a published release) |
-| 7 Real-PC test | Waiting for a PC |
-| 8 README and release | README written. `publish.sh 0.9.0 release-notes/0.9.0.md` is ready; not run |
+| 2 Popup and tray | Done. Checked on a real PC and photographed on a Windows runner |
+| 3 Wake and unlock | Done and checked on a real PC: sleep, lid, fingerprint unlock. The lock screen is recognised by four signals (lock screen picture, secure desktop, session flag, and the app's own events), and the greeting waits for the desktop (see `GreetGate`) |
+| 4 Dhikr | Done, unit-tested, text drawn from the Mac app's Geeza Pro outlines |
+| 5 Settings and startup | Done. Launch at Login checked across a real restart; the menu stays open for settings |
+| 6 Install and updates | Done. Real in-place updates from 0.9.0 up to 0.9.5 on a real PC; signed and forged updates tested on a runner |
+| 7 Real-PC test | Done for the first PC: tray, dhikr, wake/lock, restart, update. **Not yet tested:** multiple monitors with different scaling, full-screen games and video |
+| 8 README and release | 1.0.0 prepared |
 
-Changes from the plan: the tray icon is the app icon (it already has "بسم الله" on it, which is more legible at 16 px
-than text drawn at runtime); Esc is detected by polling the key state, because the popup never takes focus; the
-release zip is built by GitHub Actions on Windows and signed afterwards on the Mac, so the shipped exe is the tested one.
+Known limits: Windows holds sign-in apps back about 10 s on its own; the Start menu is always drawn above the popup;
+no code signing (the PowerShell installer avoids the SmartScreen warning). Possible later work: arm64, winget, a
+scheduled-task start to skip Windows' sign-in delay (needs a way to do it without admin rights).
