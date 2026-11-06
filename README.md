@@ -18,6 +18,15 @@
 
 <br>
 
+<p align="center">
+  <img src="assets/demo-wake.gif" width="400" alt="The screen waking up, then the bismillah being written out in a black popup">
+  <img src="assets/demo-dhikr.gif" width="400" alt="Three dhikr opening out of the top of the screen one after another">
+</p>
+
+<p align="center">
+  <sub><b>When your PC wakes:</b> the bismillah is written out. &nbsp;·&nbsp; <b>Through the day:</b> a dhikr opens out of the top of the screen.</sub>
+</p>
+
 > **Preview.** This is the Windows version of [Bismillah for Mac](https://github.com/hafizuddin-a/bismillah-menubar).
 > The animation, the popups, the menu and the updater are tested on a real Windows machine, but waking from sleep, the
 > lock screen and multiple monitors are still waiting for a real-PC test. If something misbehaves, please
@@ -148,6 +157,7 @@ How it fits together:
 - `tools/export_data.py`: exports the letter outlines and pen strokes from the Mac app's data.
 - `tools/SignTool`, `tools/update_key.swift`: make the update-signing key and sign releases.
 - `tools/PreviewFrames`: draws animation frames with Skia so they can be checked on a Mac.
+- `tools/make_gifs.sh`: makes the two animations at the top of this page from frames that CI draws with the app's own renderer.
 - Every push is built and tested on a Windows machine by GitHub Actions, which also starts the real popup windows,
   photographs the screen, and runs a full update (a signed release installs itself, a forged one is refused).
 
