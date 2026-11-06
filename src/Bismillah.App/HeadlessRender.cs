@@ -166,7 +166,7 @@ internal static class HeadlessRender
                 report.AppendLine("== launch at login ==");
                 report.AppendLine($"turned on: {on}, turned off: {off}");
                 report.AppendLine("== session ==");
-                report.AppendLine($"locked: {Native.IsSessionLocked()}");
+                report.AppendLine($"locked: {Native.IsSessionLocked()} ({Native.LockState()}); session flag: {Native.SessionFlag()?.ToString() ?? "unreadable"}; taskbar: {Native.ShellReady}; foreground: {Native.ForegroundProgram()}");
                 report.AppendLine($"settings file: {Settings.DefaultPath}");
                 report.AppendLine($"screens: {System.Windows.Forms.Screen.AllScreens.Length}, scale of primary: {Native.ScaleOf(System.Windows.Forms.Screen.PrimaryScreen!)}");
                 File.WriteAllText(Path.Combine(folder, "host-report.txt"), report.ToString());

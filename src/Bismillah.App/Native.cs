@@ -15,6 +15,7 @@ internal static class Native
     public const int DEVICE_NOTIFY_WINDOW_HANDLE = 0;
     public const uint DESKTOP_SWITCHDESKTOP = 0x0100;
     public const uint MONITOR_DEFAULTTONEAREST = 2;
+    private const int WTSSessionInfoEx = 25;
 
     // display on/off, from "power setting" notifications: 0 off, 1 on, 2 dimmed
     public static readonly Guid GUID_CONSOLE_DISPLAY_STATE = new("6fe69556-704a-47a0-8f24-c28d936fda47");
@@ -46,12 +47,31 @@ internal static class Native
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
 
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    private static extern bool WTSQuerySessionInformationW(IntPtr server, uint sessionId, int infoClass, out IntPtr buffer, out uint bytes);
+    [DllImport("wtsapi32.dll")] private static extern void WTSFreeMemory(IntPtr memory);
+
     /// <summary>
-    /// True while the lock screen, the sign-in screen (password, PIN, fingerprint) or another secure desktop is up:
-    /// nothing of ours can be seen then. Two independent signals, because either alone can miss a state: the input
-    /// desktop is not ours to open, or Windows' sign-in UI (LogonUI) is running in this session.
+    /// Why the session counts as locked right now, or "" if it doesn't. Windows 10/11 show the lock screen in two
+    /// stages: first a picture (LockApp.exe, on the normal desktop, with the session not yet flagged locked) and only
+    /// after a key or click the password/PIN box. A fingerprint can unlock straight from the picture. So several
+    /// independent signals are checked:
+    ///  - the foreground window is the lock screen picture (LockApp.exe);
+    ///  - the input desktop is not ours to open (the password/PIN screen);
+    ///  - Windows' sign-in UI (LogonUI.exe) is running in this session;
+    ///  - the session's own state flag says locked (WTSSessionInfoEx; documented, Windows 10 and later).
     /// </summary>
-    public static bool IsSessionLocked() => InputDesktopIsSecure() || LogonUiRunning();
+    public static string LockState()
+    {
+        if (ForegroundProgram() == "LockApp") return "lock screen";
+        if (InputDesktopIsSecure()) return "secure desktop";
+        if (LogonUiRunning()) return "sign-in UI";
+        if (SessionFlagSaysLocked()) return "session flag";
+        return "";
+    }
+
+    /// <summary>True while the lock screen, the sign-in screen (password, PIN, fingerprint) or another secure desktop is up.</summary>
+    public static bool IsSessionLocked() => LockState() != "";
 
     private static bool InputDesktopIsSecure()
     {
@@ -74,6 +94,27 @@ internal static class Native
         catch { }
         return false;
     }
+
+    /// <summary>
+    /// The SessionFlags field of WTSINFOEX_LEVEL1: 0 = locked, 1 = unlocked, 0xFFFFFFFF = unknown (which must not count
+    /// as locked). The struct is read by offset (Level at 0, then the level-1 block at 8: SessionId, SessionState,
+    /// SessionFlags), and trusted only if its SessionId matches ours.
+    /// </summary>
+    public static int? SessionFlag()
+    {
+        IntPtr buffer = IntPtr.Zero;
+        try
+        {
+            uint session = (uint)Process.GetCurrentProcess().SessionId;
+            if (!WTSQuerySessionInformationW(IntPtr.Zero, session, WTSSessionInfoEx, out buffer, out uint bytes) || bytes < 20) return null;
+            if (Marshal.ReadInt32(buffer, 0) != 1 || Marshal.ReadInt32(buffer, 8) != (int)session) return null;
+            return Marshal.ReadInt32(buffer, 16);
+        }
+        catch { return null; }
+        finally { if (buffer != IntPtr.Zero) WTSFreeMemory(buffer); }
+    }
+
+    private static bool SessionFlagSaysLocked() => SessionFlag() == 0;
 
     /// <summary>The taskbar exists, so the desktop has finished loading (it doesn't yet while Windows is still signing in).</summary>
     public static bool ShellReady => FindWindow("Shell_TrayWnd", null) != IntPtr.Zero;

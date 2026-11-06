@@ -109,9 +109,10 @@ internal sealed class AppHost : IDisposable
 
     private void PollGreeting()
     {
-        bool locked = Native.IsSessionLocked();
+        string lockReason = Native.LockState();
+        bool locked = lockReason != "";
         bool shell = Native.ShellReady, startMenu = Native.StartMenuOpen();
-        string state = $"locked={locked} display={_wake.DisplayOn} taskbar={shell} startMenu={startMenu} in={Native.ForegroundProgram()}";
+        string state = $"locked={(locked ? lockReason : "no")} display={_wake.DisplayOn} taskbar={shell} startMenu={startMenu} in={Native.ForegroundProgram()}";
         if (state != _lastGreetState) { _lastGreetState = state; Log.Write("waiting: " + state); }
         if (_greet.ShouldGreet(DateTime.Now, locked, _wake.DisplayOn, deskReady: shell && !startMenu))
         {
