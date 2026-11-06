@@ -73,6 +73,24 @@ internal static class HeadlessRender
         rows.Arrange(new Rect(rows.DesiredSize));
         rows.UpdateLayout();
         SavePng(Render(rows, (int)Math.Ceiling(rows.DesiredSize.Width), (int)Math.Ceiling(rows.DesiredSize.Height)), Path.Combine(folder, "dhikr-shapes.png"));
+        // the dhikr in every Arabic font that might suit it, to choose one by eye
+        string[] fonts = ["Segoe UI", "Segoe UI Variable Text", "Sakkal Majalla", "Arabic Typesetting", "Traditional Arabic", "Simplified Arabic",
+                          "Tahoma", "Arial", "Times New Roman", "Aldhabi", "Urdu Typesetting", "Microsoft Uighur", "Noto Naskh Arabic", "Amiri"];
+        var fontSheet = new StackPanel { Background = Brushes.Black, Width = 1100 };
+        foreach (string name in fonts)
+        {
+            bool installed = new Typeface(name).TryGetGlyphTypeface(out var glyphs) && glyphs.FamilyNames.Values.Any(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 4, 8, 4) };
+            row.Children.Add(new TextBlock { Text = installed ? name : name + " (not installed)", Foreground = Brushes.Gray, Width = 210, FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
+            foreach (var phrase in Dhikr.Phrases)
+                row.Children.Add(new TextBlock { Text = phrase.Arabic, Foreground = installed ? Brushes.White : Brushes.DimGray, FontFamily = new FontFamily(name), FontSize = 30,
+                    FlowDirection = FlowDirection.RightToLeft, Width = 290, TextAlignment = TextAlignment.Center });
+            fontSheet.Children.Add(row);
+        }
+        fontSheet.Measure(new Size(1100, double.PositiveInfinity));
+        fontSheet.Arrange(new Rect(fontSheet.DesiredSize));
+        fontSheet.UpdateLayout();
+        SavePng(Render(fontSheet, 1100, (int)Math.Ceiling(fontSheet.DesiredSize.Height)), Path.Combine(folder, "dhikr-fonts.png"));
         Console.WriteLine($"wrote frames to {folder}");
         return 0;
     }

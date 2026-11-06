@@ -113,6 +113,10 @@ internal sealed class DhikrView : Grid
         set
         {
             Shape.Progress = value;
+            // the text is clipped to the shape (in the label's own coordinates), so it never spills out while the shape is still opening
+            var clip = Shape.ShapeGeometry.Clone();
+            clip.Transform = new TranslateTransform(-DhikrShape.ShadowMargin, -(DhikrShape.TopInset + (DhikrShape.TextAreaHeight - 44) / 2));
+            _label.Clip = clip;
             _label.Opacity = Math.Clamp((Shape.Progress - 0.55) / 0.35, 0, 1);       // the text arrives once the shape is mostly open
         }
     }
