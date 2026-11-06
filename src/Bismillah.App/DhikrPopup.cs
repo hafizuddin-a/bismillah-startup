@@ -63,6 +63,7 @@ internal sealed class DhikrView : Grid
 {
     public readonly DhikrShape Shape = new();
     private readonly System.Windows.Shapes.Path _label;
+    private readonly Grid _labelHost = new() { IsHitTestVisible = false };
 
     public DhikrView(Dhikr phrase)
     {
@@ -91,7 +92,8 @@ internal sealed class DhikrView : Grid
             IsHitTestVisible = false,
             Opacity = 0,
         };
-        Children.Add(_label);
+        _labelHost.Children.Add(_label);
+        Children.Add(_labelHost);
         System.Windows.Automation.AutomationProperties.SetName(this, phrase.Reading);
         Progress = 0;
     }
@@ -102,13 +104,9 @@ internal sealed class DhikrView : Grid
         set
         {
             Shape.Progress = value;
-            // the text is clipped to the shape, so it never spills out while the shape is still opening.
-            // (The clip is in the path's own coordinates, so it goes through the inverse of the text's transform.)
-            var clip = Shape.ShapeGeometry.Clone();
-            var matrix = ((MatrixTransform)_label.RenderTransform).Matrix;
-            matrix.Invert();
-            clip.Transform = new MatrixTransform(matrix);
-            _label.Clip = clip;
+            // the text is clipped to the shape (on a host that fills the view, so both share coordinates), so it never
+            // spills out while the shape is still opening
+            _labelHost.Clip = Shape.ShapeGeometry;
             _label.Opacity = Math.Clamp((Shape.Progress - 0.55) / 0.35, 0, 1);       // the text arrives once the shape is mostly open
         }
     }
