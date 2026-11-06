@@ -27,6 +27,7 @@ internal sealed class AppHost : IDisposable
     private Forms.ToolStripMenuItem _startParent = null!, _endParent = null!, _nextItem = null!;
     private Forms.ToolStripMenuItem _loginItem = null!, _allScreensItem = null!, _autoUpdateItem = null!;
     private bool _keepMenuOpen;
+    private readonly List<string> _closingLog = [];
 
     public AppHost(Action quit, bool afterUpdate, bool atLogin = false)
     {
@@ -166,8 +167,9 @@ internal sealed class AppHost : IDisposable
 
     /// <summary>Stops a click on a sticky item from closing this menu or submenu.</summary>
     private void KeepOpenWhenSticky(Forms.ToolStripDropDown dropDown) =>
-        dropDown.Closing += (_, e) =>
+        dropDown.Closing += (sender, e) =>
         {
+            if (_closingLog.Count < 40) _closingLog.Add($"{(sender as Forms.ToolStripDropDown)?.Name ?? sender?.GetType().Name}:{e.CloseReason}:keep={_keepMenuOpen}");
             if (e.CloseReason == Forms.ToolStripDropDownCloseReason.ItemClicked && _keepMenuOpen) e.Cancel = true;
         };
 
@@ -275,7 +277,7 @@ internal sealed class AppHost : IDisposable
             await Task.Delay(200);
             _menu.Close();
 
-            string report = $"menu shown: {shown}; ordinary click closed it: {plainClosed}; sticky click left it open: {stickyOpen}; tick followed the setting: {ticked}";
+            string report = $"closing events: [{string.Join(", ", _closingLog)}]; menu shown: {shown}; ordinary click closed it: {plainClosed}; sticky click left it open: {stickyOpen}; tick followed the setting: {ticked}";
             return (shown && plainClosed, stickyOpen && ticked, report);
         }
         finally { _menu.Items.Remove(probe); }
