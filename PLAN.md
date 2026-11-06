@@ -3,7 +3,7 @@
 The Windows version of [bismillah-menubar](https://github.com/hafizuddin-a/bismillah-menubar). Same behaviour, same
 logo and icon, rewritten for Windows because none of the Swift code can run there.
 
-**Stack:** C# on .NET 8 with WPF. Windows 10 (1809) and later, x64 first, arm64 later.
+**Stack:** C# on .NET 10 with WPF. Windows 10 (1809) and later, x64 first, arm64 later.
 **Repo:** `hafizuddin-a/bismillah-startup`, MIT, same README style as the Mac app.
 **Testing:** builds and unit tests run on GitHub Actions (`windows-latest`); the real checks need a Windows PC, listed in
 phase 7. The Mac can build the app (`dotnet publish -r win-x64`) but not run it.
@@ -74,3 +74,21 @@ Phases 1 to 6 can all be built and unit-tested without a Windows PC. Phase 7 is 
   round or two of fixes after the first real test.
 - WPF has no true transparent click-through for the area around the popup, so the window is sized to the popup itself.
 - Windows power events differ by laptop (Modern Standby vs S3 sleep); the test on the user's PC covers only theirs.
+
+## Status (6 Nov 2026)
+
+| Phase | State |
+|---|---|
+| 0 Repo | Done: https://github.com/hafizuddin-a/bismillah-startup |
+| 1 Data and animation | Done. Frames drawn by Skia (on the Mac) and by WPF (on a Windows runner) match the Mac app's |
+| 2 Popup and tray | Done. Real popup windows photographed on a Windows runner, animated, on one screen |
+| 3 Wake and unlock | Written (resume, display-on, session unlock, lock detection). **Not testable without a real PC** |
+| 4 Dhikr | Done and unit-tested (scheduler on a fake clock). Popup photographed on a Windows runner |
+| 5 Settings and startup | Done. Launch at Login switched on and off in the real registry on a runner |
+| 6 Install and updates | Done. A signed release installing itself in place, and a forged one refused, tested on a runner. `get.ps1` written but **not run yet** (needs a published release) |
+| 7 Real-PC test | Waiting for a PC |
+| 8 README and release | README written. `publish.sh 0.9.0 release-notes/0.9.0.md` is ready; not run |
+
+Changes from the plan: the tray icon is the app icon (it already has "بسم الله" on it, which is more legible at 16 px
+than text drawn at runtime); Esc is detected by polling the key state, because the popup never takes focus; the
+release zip is built by GitHub Actions on Windows and signed afterwards on the Mac, so the shipped exe is the tested one.
