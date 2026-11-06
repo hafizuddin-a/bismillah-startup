@@ -13,6 +13,9 @@ $port = 8765
 function Fail($message) { Write-Host "FAILED: $message"; Get-Content "$env:APPDATA/Bismillah/bismillah.log" -ErrorAction SilentlyContinue; exit 1 }
 function Version($path) { (Get-Item $path).VersionInfo.FileVersion }
 
+# the copy that gets "installed" (the app's own version doesn't matter here, so build both explicitly)
+dotnet publish src/Bismillah.App -c Release -o "$work/v100" -p:Version=1.0.0 | Out-Null
+
 # the new release
 dotnet publish src/Bismillah.App -c Release -o "$work/v101" -p:Version=1.0.1 | Out-Null
 if ((Version "$work/v101/Bismillah.exe") -notlike '1.0.1*') { Fail "the 1.0.1 build has version $(Version "$work/v101/Bismillah.exe")" }
@@ -40,7 +43,7 @@ Start-Sleep 2
 try {
     function RunInstalled($name) {
         $dir = New-Item -ItemType Directory "$work/$name"
-        Copy-Item dist/publish/Bismillah.exe $dir
+        Copy-Item "$work/v100/Bismillah.exe" $dir
         if ((Version "$dir/Bismillah.exe") -notlike '1.0.0*') { Fail "the installed build has version $(Version "$dir/Bismillah.exe")" }
         $env:BISMILLAH_FEED_URL = "http://localhost:$port/latest.json"
         $env:BISMILLAH_UPDATE_KEY = $pub
