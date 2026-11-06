@@ -20,7 +20,7 @@ if (-not [Environment]::Is64BitOperatingSystem) { Fail 'Bismillah needs 64-bit W
 $dir = if ($env:BISMILLAH_DIR) { $env:BISMILLAH_DIR } else { Join-Path $env:LOCALAPPDATA 'Bismillah' }
 
 Write-Host 'Looking up the latest release...'
-try { $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers @{ 'User-Agent' = 'Bismillah-installer' } }
+try { $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -UseBasicParsing -Headers @{ 'User-Agent' = 'Bismillah-installer' } }
 catch { Fail "couldn't reach GitHub. $($_.Exception.Message)" }
 $tag = $release.tag_name
 $asset = $release.assets | Where-Object { $_.name -like 'Bismillah-*-win-x64.zip' } | Select-Object -First 1
@@ -31,7 +31,7 @@ New-Item -ItemType Directory $work | Out-Null
 try {
     Write-Host "Downloading Bismillah $tag..."
     $zip = Join-Path $work 'Bismillah.zip'
-    try { Invoke-WebRequest $asset.browser_download_url -OutFile $zip -Headers @{ 'User-Agent' = 'Bismillah-installer' } }
+    try { Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing -Headers @{ 'User-Agent' = 'Bismillah-installer' } }
     catch { Fail "the download didn't finish. $($_.Exception.Message)" }
 
     # the release notes list the zip's SHA-256; check it when it's there
