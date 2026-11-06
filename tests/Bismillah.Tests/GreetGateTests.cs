@@ -19,8 +19,8 @@ public class GreetGateTests
         var gate = new GreetGate();
         gate.Woke(T0);
         Assert.False(gate.ShouldGreet(T0.AddSeconds(1), false, true));
-        Assert.False(gate.ShouldGreet(T0.AddSeconds(3.9), false, true));
-        Assert.True(gate.ShouldGreet(T0.AddSeconds(4.1), false, true));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(2.4), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(2.6), false, true));
         Assert.False(gate.ShouldGreet(T0.AddSeconds(5), false, true));      // only once
         Assert.False(gate.Pending);
     }
@@ -35,7 +35,7 @@ public class GreetGateTests
         Assert.False(gate.ShouldGreet(T0.AddSeconds(1.5), true, true));     // lock screen is up
         Assert.False(gate.ShouldGreet(T0.AddSeconds(10), true, true));      // still typing the PIN
         Assert.False(gate.ShouldGreet(T0.AddSeconds(12), false, true));     // unlocked: a beat first
-        Assert.True(gate.ShouldGreet(T0.AddSeconds(12.8), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(12.5), false, true));
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public class GreetGateTests
         gate.Woke(T0);
         gate.Locked();
         Assert.False(gate.ShouldGreet(T0.AddSeconds(6), false, true));      // past the settle time, but it was locked
-        Assert.True(gate.ShouldGreet(T0.AddSeconds(6.8), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(6.5), false, true));
     }
 
     [Fact]
@@ -64,8 +64,8 @@ public class GreetGateTests
         var gate = new GreetGate();
         gate.Woke(T0);                                                       // resume
         gate.Woke(T0.AddSeconds(2));                                         // display on
-        Assert.False(gate.ShouldGreet(T0.AddSeconds(4.5), false, true));
-        Assert.True(gate.ShouldGreet(T0.AddSeconds(6.1), false, true));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(4.0), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(4.6), false, true));
         Assert.False(gate.ShouldGreet(T0.AddSeconds(7), false, true));
     }
 
@@ -103,17 +103,6 @@ public class GreetGateDesktopTests
         Assert.False(gate.ShouldGreet(T0.AddSeconds(10.2), false, true));                    // ready again: settle first
         Assert.True(gate.ShouldGreet(T0.AddSeconds(14.5), false, true));
     }
-
-    [Fact]
-    public void ALaterWakeTimeDelaysTheGreeting()
-    {
-        // used at sign-in, where the app starts while Windows is still busy
-        var gate = new GreetGate();
-        gate.Woke(T0.AddSeconds(6));
-        Assert.False(gate.ShouldGreet(T0.AddSeconds(9), false, true));
-        Assert.False(gate.ShouldGreet(T0.AddSeconds(9.9), false, true));
-        Assert.True(gate.ShouldGreet(T0.AddSeconds(10.1), false, true));
-    }
 }
 
 public class GreetGateSignInTests
@@ -146,7 +135,7 @@ public class GreetGateSignInTests
         gate.Woke(T0, settle: TimeSpan.FromSeconds(1));
         Assert.True(gate.ShouldGreet(T0.AddSeconds(2), false, true));
         gate.Woke(T0.AddHours(1));
-        Assert.False(gate.ShouldGreet(T0.AddHours(1).AddSeconds(2), false, true));
-        Assert.True(gate.ShouldGreet(T0.AddHours(1).AddSeconds(4.1), false, true));
+        Assert.False(gate.ShouldGreet(T0.AddHours(1).AddSeconds(1.5), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddHours(1).AddSeconds(2.6), false, true));
     }
 }

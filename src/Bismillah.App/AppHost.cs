@@ -20,7 +20,7 @@ internal sealed class AppHost : IDisposable
 
     private readonly GreetGate _greet = new();
     private string _lastGreetState = "";
-    private readonly DispatcherTimer _greetTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
+    private readonly DispatcherTimer _greetTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
 
     // menu items that change with the settings, kept so the open menu can be updated in place
     private readonly List<(int Count, Forms.ToolStripMenuItem Item)> _countItems = [];
@@ -69,7 +69,7 @@ internal sealed class AppHost : IDisposable
         // After an automatic update the app reopens itself quietly. Opened by hand it greets you straight away; started
         // at sign-in it waits for the desktop to be ready first (Windows starts these apps while it is still setting up).
         _greetTimer.Tick += (_, _) => PollGreeting();
-        if (atLogin) Wake("signed in", settle: TimeSpan.FromSeconds(1));      // the desktop is already up; the lock/taskbar checks still apply
+        if (atLogin) Wake("signed in", settle: TimeSpan.FromSeconds(0.3));      // the desktop is already up; the lock/taskbar checks still apply
         else if (!afterUpdate) ShowGreeting();
         StartupRegistration.KeepCurrent();
         _updater.StartAutomaticChecks();
@@ -105,6 +105,7 @@ internal sealed class AppHost : IDisposable
         _greet.Woke(DateTime.Now, settle);
         _greetTimer.Start();
         Log.Write($"greeting pending ({why})");
+        PollGreeting();                           // no need to wait for the first tick
     }
 
     private void PollGreeting()

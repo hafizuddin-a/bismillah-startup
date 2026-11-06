@@ -6,6 +6,19 @@ internal static class Program
 {
     private static Mutex? _singleInstance;
 
+    /// <summary>How long ago this sign-in began (when its Explorer started), i.e. how long Windows held the app back.</summary>
+    private static string SignInAge()
+    {
+        try
+        {
+            int session = System.Diagnostics.Process.GetCurrentProcess().SessionId;
+            var explorer = System.Diagnostics.Process.GetProcessesByName("explorer").Where(p => p.SessionId == session).Select(p => p.StartTime).DefaultIfEmpty(DateTime.MaxValue).Min();
+            if (explorer == DateTime.MaxValue) return "desktop start unknown";
+            return $"desktop started {(System.Diagnostics.Process.GetCurrentProcess().StartTime - explorer).TotalSeconds:0.0} s before the app";
+        }
+        catch { return "desktop start unknown"; }
+    }
+
     [STAThread]
     private static int Main(string[] args)
     {
@@ -24,7 +37,7 @@ internal static class Program
         if (!first && !args.Contains("--after-update")) return 0;
         if (!first) { _singleInstance.Dispose(); _singleInstance = new Mutex(true, @"Local\Bismillah.SingleInstance", out first); if (!first) return 0; }
 
-        Log.Write($"started {Updater.CurrentVersion} ({string.Join(' ', args)}) from {Environment.ProcessPath}; PC up {TimeSpan.FromMilliseconds(Environment.TickCount64):h\\:mm\\:ss}");
+        Log.Write($"started {Updater.CurrentVersion} ({string.Join(' ', args)}) from {Environment.ProcessPath}; PC up {TimeSpan.FromMilliseconds(Environment.TickCount64):h\\:mm\\:ss}; {SignInAge()}");
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("crashed: " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Write("background task failed: " + e.Exception); e.SetObserved(); };
 

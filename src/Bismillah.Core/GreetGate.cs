@@ -12,8 +12,8 @@ namespace Bismillah;
 /// </summary>
 public sealed class GreetGate
 {
-    public static readonly TimeSpan Settle = TimeSpan.FromSeconds(4);
-    public static readonly TimeSpan AfterUnlock = TimeSpan.FromMilliseconds(700);
+    public static readonly TimeSpan Settle = TimeSpan.FromSeconds(2.5);
+    public static readonly TimeSpan AfterUnlock = TimeSpan.FromMilliseconds(400);
     public static readonly TimeSpan MinimumGap = TimeSpan.FromSeconds(5);
 
     private DateTime _lastWake, _lastGreeting = DateTime.MinValue;

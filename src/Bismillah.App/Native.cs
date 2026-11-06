@@ -58,14 +58,13 @@ internal static class Native
     /// independent signals are checked:
     ///  - the foreground window is the lock screen picture (LockApp.exe);
     ///  - the input desktop is not ours to open (the password/PIN screen);
-    ///  - Windows' sign-in UI (LogonUI.exe) is running in this session;
     ///  - the session's own state flag says locked (WTSSessionInfoEx; documented, Windows 10 and later).
+    /// LogonUI.exe running is deliberately not a signal: it lingers for a while after the unlock.
     /// </summary>
     public static string LockState()
     {
         if (ForegroundProgram() == "LockApp") return "lock screen";
         if (InputDesktopIsSecure()) return "secure desktop";
-        if (LogonUiRunning()) return "sign-in UI";
         if (SessionFlagSaysLocked()) return "session flag";
         return "";
     }
@@ -78,20 +77,6 @@ internal static class Native
         IntPtr desktop = OpenInputDesktop(0, false, DESKTOP_SWITCHDESKTOP);
         if (desktop == IntPtr.Zero) return true;
         CloseDesktop(desktop);
-        return false;
-    }
-
-    private static bool LogonUiRunning()
-    {
-        try
-        {
-            int session = Process.GetCurrentProcess().SessionId;
-            foreach (var process in Process.GetProcessesByName("LogonUI"))
-            {
-                using (process) { try { if (process.SessionId == session) return true; } catch { } }
-            }
-        }
-        catch { }
         return false;
     }
 
