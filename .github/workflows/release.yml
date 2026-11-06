@@ -1,0 +1,36 @@
+name: Release
+
+# Pushing a tag like v1.0.0 builds the app on Windows and attaches the zip to a DRAFT release.
+# publish.sh then signs the zip with the private key on the maintainer's Mac and publishes the release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Test
+        run: dotnet test Bismillah.sln --configuration Release
+      - name: Build the zip
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          dotnet publish src/Bismillah.App -c Release -o dist/publish -p:Version=$version
+          $exeVersion = (Get-Item dist/publish/Bismillah.exe).VersionInfo.FileVersion
+          if ($exeVersion -notlike "$version*") { throw "built version $exeVersion, expected $version" }
+          Compress-Archive -Path dist/publish/Bismillah.exe -DestinationPath "Bismillah-$version-win-x64.zip"
+      - name: Draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          gh release create '${{ github.ref_name }}' "Bismillah-$version-win-x64.zip" --draft --title "Bismillah $version" --notes "Building..."
