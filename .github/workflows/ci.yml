@@ -7,6 +7,32 @@ on:
   workflow_dispatch:
 
 jobs:
+  install:
+    # the one-line installer from the README, against the real published release, in both flavours of PowerShell
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install with PowerShell 7
+        shell: pwsh
+        run: |
+          $env:BISMILLAH_DIR = "$PWD/install7"; $env:BISMILLAH_NO_OPEN = '1'
+          ./get.ps1
+          (Get-Item install7/Bismillah.exe).VersionInfo.FileVersion
+      - name: Install with Windows PowerShell 5.1 (what most people have)
+        shell: powershell
+        run: |
+          $env:BISMILLAH_DIR = "$PWD/install5"; $env:BISMILLAH_NO_OPEN = '1'
+          ./get.ps1
+          (Get-Item install5/Bismillah.exe).VersionInfo.FileVersion
+      - name: The installed app starts
+        shell: pwsh
+        run: |
+          $p = Start-Process install5/Bismillah.exe -PassThru
+          Start-Sleep 6
+          if ($p.HasExited) { throw "the installed app exited with code $($p.ExitCode)" }
+          "running, pid $($p.Id)"
+          Stop-Process $p -Force
+
   build:
     runs-on: windows-latest
     steps:
