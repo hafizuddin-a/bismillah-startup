@@ -197,15 +197,15 @@ internal sealed class Updater
         {
             UpdateSwap.Apply(Environment.ProcessPath!, target);
         }
-        catch
+        catch (Exception e)
         {
-            // couldn't swap: leave the old version running next time rather than nothing
+            // couldn't swap: the old version is put back and reopened below, rather than leaving nothing running
+            Log.Write("couldn't apply the update: " + e.Message);
         }
         Process.Start(new ProcessStartInfo(target) { ArgumentList = { "--after-update" }, UseShellExecute = false });
         // this exe is still running from the scratch folder, so a short-lived helper removes it afterwards
-        Process.Start(new ProcessStartInfo("cmd.exe")
+        Process.Start(new ProcessStartInfo("cmd.exe", $"/c ping -n 6 127.0.0.1 >nul & rd /s /q \"{work}\"")
         {
-            ArgumentList = { "/c", $"ping -n 6 127.0.0.1 >nul & rd /s /q \"{work}\"" },
             CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden,
         });
         return 0;
