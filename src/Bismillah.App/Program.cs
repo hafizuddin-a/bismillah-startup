@@ -15,6 +15,7 @@ internal static class Program
 
         // CI helpers: draw frames to PNG files / put the real windows on screen, then exit
         if (args.Length >= 2 && args[0] == "--render-frames") return HeadlessRender.Run(args[1]);
+        if (args.Length >= 2 && args[0] == "--render-gif-frames") return DemoScene.Run(args[1]);
         if (args.Length >= 2 && args[0] == "--smoke") return HeadlessRender.Smoke(args[1]);
         if (args.Length >= 2 && args[0] == "--smoke-host") return HeadlessRender.SmokeHost(args[1]);
 

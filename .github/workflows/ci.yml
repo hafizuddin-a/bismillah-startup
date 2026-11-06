@@ -55,6 +55,14 @@ jobs:
           Get-ChildItem out | Format-Table Name, Length
           if ($p.ExitCode -ne 0 -or -not (Test-Path out/bismillah-frames.png)) { throw "rendering failed" }
 
+      - name: Draw the frames of the README animations
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/publish/Bismillah.exe -ArgumentList '--render-gif-frames', "$PWD/gif-frames" -Wait -PassThru
+          "exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0 -or -not (Test-Path gif-frames/wake.txt)) { throw "frame rendering failed" }
+          (Get-ChildItem gif-frames).Count
+
       - name: Open the real popup windows and photograph the screen
         shell: pwsh
         run: |
@@ -80,6 +88,10 @@ jobs:
         with:
           name: rendered-frames
           path: out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gif-frames
+          path: gif-frames
       - uses: actions/upload-artifact@v4
         with:
           name: Bismillah-win-x64

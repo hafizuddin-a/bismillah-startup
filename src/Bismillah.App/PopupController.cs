@@ -7,11 +7,36 @@ using Forms = System.Windows.Forms;
 
 namespace Bismillah;
 
-/// <summary>One black rounded window holding the writing animation.</summary>
-internal sealed class PopupWindow : Window
+/// <summary>The black rounded popup with its shadow: what the popup window shows, and what the README's animation draws.</summary>
+internal sealed class PopupView : Grid
 {
     public const double PopupWidth = 520, PopupHeight = 180, ShadowMargin = 60;
     public readonly BismillahCanvas Canvas = new();
+
+    public PopupView()
+    {
+        Width = PopupWidth + 2 * ShadowMargin;
+        Height = PopupHeight + 2 * ShadowMargin;
+        // the shadow sits on its own static layer so it isn't redrawn every frame
+        Children.Add(new Border
+        {
+            Margin = new Thickness(ShadowMargin), Background = Brushes.Black, CornerRadius = new CornerRadius(30),
+            Effect = new DropShadowEffect { BlurRadius = 50, ShadowDepth = 12, Direction = 270, Opacity = 0.45, Color = Colors.Black },
+        });
+        Children.Add(new Border
+        {
+            Margin = new Thickness(ShadowMargin), Background = Brushes.Black, CornerRadius = new CornerRadius(30),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(18, 255, 255, 255)), BorderThickness = new Thickness(1),
+            Child = Canvas,
+        });
+    }
+}
+
+/// <summary>One borderless window holding the popup.</summary>
+internal sealed class PopupWindow : Window
+{
+    public readonly PopupView View = new();
+    public BismillahCanvas Canvas => View.Canvas;
 
     public PopupWindow()
     {
@@ -23,30 +48,13 @@ internal sealed class PopupWindow : Window
         Topmost = true;
         ResizeMode = ResizeMode.NoResize;
         Focusable = false;
-        Width = PopupWidth + 2 * ShadowMargin;
-        Height = PopupHeight + 2 * ShadowMargin;
+        Width = View.Width;
+        Height = View.Height;
         Title = "Bismillah";
-        AutomationProperties_Name();
-
-        var grid = new Grid();
-        // the shadow sits on its own static layer so it isn't redrawn every frame
-        grid.Children.Add(new Border
-        {
-            Margin = new Thickness(ShadowMargin), Background = Brushes.Black, CornerRadius = new CornerRadius(30),
-            Effect = new DropShadowEffect { BlurRadius = 50, ShadowDepth = 12, Direction = 270, Opacity = 0.45, Color = Colors.Black },
-        });
-        var body = new Border
-        {
-            Margin = new Thickness(ShadowMargin), Background = Brushes.Black, CornerRadius = new CornerRadius(30),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(18, 255, 255, 255)), BorderThickness = new Thickness(1),
-            Child = Canvas,
-        };
-        grid.Children.Add(body);
-        Content = grid;
+        System.Windows.Automation.AutomationProperties.SetName(this, "Bismillah");
+        Content = View;
         SourceInitialized += (_, _) => ScreenPlacement.MakeNonActivating(this);
     }
-
-    private void AutomationProperties_Name() => System.Windows.Automation.AutomationProperties.SetName(this, "Bismillah");
 }
 
 /// <summary>
