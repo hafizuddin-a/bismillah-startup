@@ -26,7 +26,6 @@ internal sealed class AppHost : IDisposable
     private readonly List<(int Hour, Forms.ToolStripMenuItem Item)> _startItems = [], _endItems = [];
     private Forms.ToolStripMenuItem _startParent = null!, _endParent = null!, _nextItem = null!;
     private Forms.ToolStripMenuItem _loginItem = null!, _allScreensItem = null!, _autoUpdateItem = null!;
-    private bool _keepMenuOpen;
     private readonly List<string> _closingLog = [];
 
     public AppHost(Action quit, bool afterUpdate, bool atLogin = false)
@@ -50,7 +49,7 @@ internal sealed class AppHost : IDisposable
                 typeof(Forms.NotifyIcon).GetMethod("ShowContextMenu", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.Invoke(_tray, null);
         };
         BuildMenu();
-        _menu.Opening += (_, _) => { _keepMenuOpen = false; RefreshMenu(); };
+        _menu.Opening += (_, _) => RefreshMenu();
 
         _dhikr.WakeAt += due =>
         {
@@ -148,30 +147,48 @@ internal sealed class AppHost : IDisposable
     private Forms.ToolStripMenuItem Plain(string text, Action action)
     {
         var item = new Forms.ToolStripMenuItem(text);
-        item.Click += (_, _) => { _keepMenuOpen = false; action(); };
+        item.Click += (_, _) => action();
         return item;
     }
 
     /// <summary>A setting you may want to change several times: clicking it updates the ticks and leaves the menu open.</summary>
     private Forms.ToolStripMenuItem Sticky(string text, Action action)
     {
-        var item = new Forms.ToolStripMenuItem(text);
+        var item = new Forms.ToolStripMenuItem(text) { Tag = StickyTag };
         item.Click += (_, _) =>
         {
-            _keepMenuOpen = true;
             action();
             RefreshMenu();
         };
         return item;
     }
 
-    /// <summary>Stops a click on a sticky item from closing this menu or submenu.</summary>
+    private const string StickyTag = "sticky";
+
+    /// <summary>
+    /// Stops a click on a sticky item from closing this menu or submenu. Windows announces the close before it runs the
+    /// item's click handler, so the clicked item is found by what is highlighted (the item under the mouse, or the one
+    /// the keyboard is on), following open submenus down to the item itself.
+    /// </summary>
     private void KeepOpenWhenSticky(Forms.ToolStripDropDown dropDown) =>
         dropDown.Closing += (sender, e) =>
         {
-            if (_closingLog.Count < 40) _closingLog.Add($"{(sender as Forms.ToolStripDropDown)?.Name ?? sender?.GetType().Name}:{e.CloseReason}:keep={_keepMenuOpen}");
-            if (e.CloseReason == Forms.ToolStripDropDownCloseReason.ItemClicked && _keepMenuOpen) e.Cancel = true;
+            bool sticky = e.CloseReason == Forms.ToolStripDropDownCloseReason.ItemClicked && HighlightedIsSticky(dropDown);
+            if (_closingLog.Count < 40) _closingLog.Add($"{e.CloseReason}:sticky={sticky}");
+            if (sticky) e.Cancel = true;
         };
+
+    private static bool HighlightedIsSticky(Forms.ToolStripDropDown dropDown)
+    {
+        foreach (Forms.ToolStripItem item in dropDown.Items)
+        {
+            if (!item.Selected) continue;
+            if (item is Forms.ToolStripMenuItem { HasDropDownItems: true } parent)
+                return parent.DropDown.Visible && HighlightedIsSticky(parent.DropDown);
+            return item.Tag is StickyTag;
+        }
+        return false;
+    }
 
     private void BuildMenu()
     {
@@ -262,6 +279,7 @@ internal sealed class AppHost : IDisposable
             _menu.Show(new System.Drawing.Point(60, 60));
             await Task.Delay(400);
             bool shown = _menu.Visible;
+            probe.Select();                                       // like the mouse resting on it
             probe.PerformClick();
             await Task.Delay(400);
             bool plainClosed = !_menu.Visible;
@@ -269,6 +287,7 @@ internal sealed class AppHost : IDisposable
             bool before = _settings.ShowOnAllScreens;
             _menu.Show(new System.Drawing.Point(60, 60));
             await Task.Delay(400);
+            _allScreensItem.Select();
             _allScreensItem.PerformClick();
             await Task.Delay(400);
             bool stickyOpen = _menu.Visible;
