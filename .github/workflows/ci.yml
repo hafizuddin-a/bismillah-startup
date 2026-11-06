@@ -11,7 +11,7 @@ jobs:
     # the one-line installer from the README, against the real published release, in both flavours of PowerShell
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install with PowerShell 7
         shell: pwsh
         run: |
@@ -36,8 +36,8 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -83,16 +83,16 @@ jobs:
         shell: pwsh
         run: ./tools/ci/update-test.ps1
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: rendered-frames
           path: out
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gif-frames
           path: gif-frames
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Bismillah-win-x64
           path: dist/publish/Bismillah.exe
