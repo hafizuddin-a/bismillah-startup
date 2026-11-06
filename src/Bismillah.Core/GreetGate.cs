@@ -17,15 +17,20 @@ public sealed class GreetGate
     public static readonly TimeSpan MinimumGap = TimeSpan.FromSeconds(5);
 
     private DateTime _lastWake, _lastGreeting = DateTime.MinValue;
+    private TimeSpan _settle = Settle;
     private DateTime? _unlockedSince;
     private bool _sawLock;
 
     /// <summary>A greeting is waiting for the right moment.</summary>
     public bool Pending { get; private set; }
 
-    /// <summary>The PC woke, the display came back, or the app just started at sign-in.</summary>
-    public void Woke(DateTime now)
+    /// <summary>
+    /// The PC woke, the display came back, or the app just started at sign-in. <paramref name="settle"/> overrides the
+    /// settling period (at sign-in there is no lock screen about to appear, so it can be short).
+    /// </summary>
+    public void Woke(DateTime now, TimeSpan? settle = null)
     {
+        _settle = settle ?? Settle;
         Pending = true;
         _lastWake = now;
         _unlockedSince = null;
@@ -56,7 +61,7 @@ public sealed class GreetGate
         _unlockedSince ??= now;
         bool ready = _sawLock
             ? now - _unlockedSince >= AfterUnlock
-            : now - _lastWake >= Settle;
+            : now - _lastWake >= _settle;
         if (!ready) return false;
 
         Pending = false;

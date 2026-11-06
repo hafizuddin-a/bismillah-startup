@@ -24,7 +24,7 @@ internal static class Program
         if (!first && !args.Contains("--after-update")) return 0;
         if (!first) { _singleInstance.Dispose(); _singleInstance = new Mutex(true, @"Local\Bismillah.SingleInstance", out first); if (!first) return 0; }
 
-        Log.Write($"started {Updater.CurrentVersion} ({string.Join(' ', args)}) from {Environment.ProcessPath}");
+        Log.Write($"started {Updater.CurrentVersion} ({string.Join(' ', args)}) from {Environment.ProcessPath}; PC up {TimeSpan.FromMilliseconds(Environment.TickCount64):h\\:mm\\:ss}");
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("crashed: " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Write("background task failed: " + e.Exception); e.SetObserved(); };
 

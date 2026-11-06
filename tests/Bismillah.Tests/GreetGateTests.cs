@@ -115,3 +115,38 @@ public class GreetGateDesktopTests
         Assert.True(gate.ShouldGreet(T0.AddSeconds(10.1), false, true));
     }
 }
+
+public class GreetGateSignInTests
+{
+    private static readonly DateTime T0 = new(2026, 11, 6, 9, 0, 0);
+
+    [Fact]
+    public void AShortSettlingPeriodGreetsSoonerAtSignIn()
+    {
+        var gate = new GreetGate();
+        gate.Woke(T0, settle: TimeSpan.FromSeconds(1));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(0.5), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(1.1), false, true));
+    }
+
+    [Fact]
+    public void ALockAtSignInIsStillWaitedOut()
+    {
+        var gate = new GreetGate();
+        gate.Woke(T0, settle: TimeSpan.FromSeconds(1));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(2), locked: true, displayOn: true));
+        Assert.False(gate.ShouldGreet(T0.AddSeconds(3), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(3.8), false, true));
+    }
+
+    [Fact]
+    public void ANormalWakeAfterASignInUsesTheNormalSettlingPeriod()
+    {
+        var gate = new GreetGate();
+        gate.Woke(T0, settle: TimeSpan.FromSeconds(1));
+        Assert.True(gate.ShouldGreet(T0.AddSeconds(2), false, true));
+        gate.Woke(T0.AddHours(1));
+        Assert.False(gate.ShouldGreet(T0.AddHours(1).AddSeconds(2), false, true));
+        Assert.True(gate.ShouldGreet(T0.AddHours(1).AddSeconds(4.1), false, true));
+    }
+}

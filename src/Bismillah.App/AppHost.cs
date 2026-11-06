@@ -69,7 +69,7 @@ internal sealed class AppHost : IDisposable
         // After an automatic update the app reopens itself quietly. Opened by hand it greets you straight away; started
         // at sign-in it waits for the desktop to be ready first (Windows starts these apps while it is still setting up).
         _greetTimer.Tick += (_, _) => PollGreeting();
-        if (atLogin) Wake("signed in", extraWait: TimeSpan.FromSeconds(6));      // Windows is still busy setting up the desktop
+        if (atLogin) Wake("signed in", settle: TimeSpan.FromSeconds(1));      // the desktop is already up; the lock/taskbar checks still apply
         else if (!afterUpdate) ShowGreeting();
         StartupRegistration.KeepCurrent();
         _updater.StartAutomaticChecks();
@@ -100,9 +100,9 @@ internal sealed class AppHost : IDisposable
     }
 
     /// <summary>Waits for the lock screen to be gone (see <see cref="GreetGate"/>) and then writes the bismillah.</summary>
-    private void Wake(string why, TimeSpan extraWait = default)
+    private void Wake(string why, TimeSpan? settle = null)
     {
-        _greet.Woke(DateTime.Now + extraWait);
+        _greet.Woke(DateTime.Now, settle);
         _greetTimer.Start();
         Log.Write($"greeting pending ({why})");
     }
@@ -116,7 +116,7 @@ internal sealed class AppHost : IDisposable
         if (state != _lastGreetState) { _lastGreetState = state; Log.Write("waiting: " + state); }
         if (_greet.ShouldGreet(DateTime.Now, locked, _wake.DisplayOn, deskReady: shell && !startMenu))
         {
-            Log.Write("greeting now");
+            Log.Write($"greeting now ({(DateTime.Now - Process.GetCurrentProcess().StartTime).TotalSeconds:0.0} s after the app started)");
             ShowGreeting(markGreeted: false);
         }
         if (!_greet.Pending) _greetTimer.Stop();
