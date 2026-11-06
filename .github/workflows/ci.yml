@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test Bismillah.sln --configuration Release --logger "trx;LogFileName=results.trx"
+
+      - name: Publish the app (self-contained single file)
+        run: dotnet publish src/Bismillah.App -c Release -o dist/publish
+
+      - name: Draw the real WPF frames to PNG files
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/publish/Bismillah.exe -ArgumentList '--render-frames', "$PWD/out" -Wait -PassThru
+          "exit code: $($p.ExitCode)"
+          Get-ChildItem out | Format-Table Name, Length
+          if ($p.ExitCode -ne 0 -or -not (Test-Path out/bismillah-frames.png)) { throw "rendering failed" }
+
+      - name: Open the real popup windows and photograph the screen
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $p = Start-Process -FilePath dist/publish/Bismillah.exe -ArgumentList '--smoke', "$PWD/out" -Wait -PassThru
+          "exit code: $($p.ExitCode)"
+          Get-ChildItem out | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rendered-frames
+          path: out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bismillah-win-x64
+          path: dist/publish/Bismillah.exe
