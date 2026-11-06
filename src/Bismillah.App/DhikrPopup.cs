@@ -171,7 +171,7 @@ internal sealed class DhikrPopupController
         int index = Dhikr.NextPhrase(_lastPhrase, Dhikr.Phrases.Count);
         _lastPhrase = index;
         var phrase = Dhikr.Phrases[index];
-        _reduceMotion = !SystemParameters.ClientAreaAnimation;
+        _reduceMotion = Motion.Reduce;
         _closing = null;
         _lastProgress = 0;
 

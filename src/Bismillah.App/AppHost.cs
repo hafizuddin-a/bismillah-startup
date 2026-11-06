@@ -61,6 +61,7 @@ internal sealed class AppHost : IDisposable
         if (!afterUpdate) _popup.Show(_settings.ShowOnAllScreens);
         _updater.StartAutomaticChecks();
         _dhikr.Start();
+        if (Environment.GetEnvironmentVariable("BISMILLAH_TEST_UPDATE_NOW") == "1") Later(1500, () => _updater.CheckNow());
 
         // Greet again whenever the PC wakes (lid opened, or the display woke up).
         _wake.Woke += OnWoke;
@@ -161,6 +162,26 @@ internal sealed class AppHost : IDisposable
         _menu.Items.Add("Quit Bismillah", null, (_, _) => _quit());
         _menu.Items.Add("Sincerely, @madebyhafiz", null, (_, _) =>
             Process.Start(new ProcessStartInfo("https://www.instagram.com/madebyhafiz/") { UseShellExecute = true }));
+    }
+
+    /// <summary>The menu as indented text, for the CI smoke test.</summary>
+    public string DescribeMenu()
+    {
+        RebuildMenu();
+        var text = new System.Text.StringBuilder();
+        void Walk(Forms.ToolStripItemCollection items, int depth)
+        {
+            foreach (Forms.ToolStripItem item in items)
+            {
+                if (item is Forms.ToolStripSeparator) { text.AppendLine(new string(' ', depth * 2) + "-----"); continue; }
+                string tick = item is Forms.ToolStripMenuItem { Checked: true } ? "[x] " : "";
+                string state = item.Enabled ? "" : " (disabled)";
+                text.AppendLine($"{new string(' ', depth * 2)}{tick}{item.Text}{state}");
+                if (item is Forms.ToolStripMenuItem { HasDropDownItems: true } sub) Walk(sub.DropDownItems, depth + 1);
+            }
+        }
+        Walk(_menu.Items, 0);
+        return text.ToString();
     }
 
     private static void ToggleLaunchAtLogin()

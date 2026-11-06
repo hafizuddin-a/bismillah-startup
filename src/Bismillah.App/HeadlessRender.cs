@@ -77,10 +77,11 @@ internal static class HeadlessRender
         return 0;
     }
 
-    /// <summary>Opens the real popup windows on the real desktop, waits, takes a picture of the screen, and exits.</summary>
+    /// <summary>Opens the real popup windows on the real desktop, takes pictures of the screen along the way, and exits.</summary>
     public static int Smoke(string folder)
     {
         Directory.CreateDirectory(folder);
+        Motion.ForceAnimation = true;                 // the CI machine has animations switched off; test the animated path
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         int exit = 0;
         app.Startup += async (_, _) =>
@@ -89,22 +90,72 @@ internal static class HeadlessRender
             {
                 var popup = new PopupController();
                 popup.Show(allScreens: true);
-                await Task.Delay(3200);                       // mid-writing
-                Capture(Path.Combine(folder, "screen-writing.png"));
-                await Task.Delay(3500);                       // finished
-                Capture(Path.Combine(folder, "screen-finished.png"));
-                popup.Close();
+                await Task.Delay(1500);                       // early in the writing
+                Capture(Path.Combine(folder, "screen-1-writing-early.png"));
+                await Task.Delay(1700);                       // mid-writing
+                Capture(Path.Combine(folder, "screen-2-writing-late.png"));
+                await Task.Delay(3000);                       // finished
+                Capture(Path.Combine(folder, "screen-3-finished.png"));
+                await Task.Delay(2500);                       // gone again
+                Console.WriteLine($"popup still showing after its time: {popup.IsShowing}");
+                if (popup.IsShowing) exit = 1;
 
                 var dhikr = new DhikrPopupController();
                 dhikr.Show(allScreens: true);
-                await Task.Delay(1500);
-                Capture(Path.Combine(folder, "screen-dhikr.png"));
-                dhikr.Close();
+                await Task.Delay(250);
+                Capture(Path.Combine(folder, "screen-4-dhikr-opening.png"));
+                await Task.Delay(1200);
+                Capture(Path.Combine(folder, "screen-5-dhikr-open.png"));
+                dhikr.Dismiss();
+                await Task.Delay(500);
+                Console.WriteLine($"dhikr showing after a dismiss: {dhikr.IsShowing}");
+                if (dhikr.IsShowing) exit = 1;
                 Console.WriteLine("smoke test finished");
             }
             catch (Exception e)
             {
                 Console.WriteLine("smoke test failed: " + e);
+                exit = 1;
+            }
+            app.Shutdown();
+        };
+        app.Run();
+        return exit;
+    }
+
+    /// <summary>Starts the whole app (tray icon, wake monitor, scheduler), writes down what it built, and exits.</summary>
+    public static int SmokeHost(string folder)
+    {
+        Directory.CreateDirectory(folder);
+        var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        int exit = 0;
+        app.Startup += async (_, _) =>
+        {
+            try
+            {
+                using var host = new AppHost(() => { }, afterUpdate: true);
+                await Task.Delay(1500);
+                var report = new System.Text.StringBuilder();
+                report.AppendLine("== menu ==");
+                report.Append(host.DescribeMenu());
+                StartupRegistration.Set(true);
+                bool on = StartupRegistration.IsEnabled;
+                StartupRegistration.Set(false);
+                bool off = !StartupRegistration.IsEnabled;
+                report.AppendLine("== launch at login ==");
+                report.AppendLine($"turned on: {on}, turned off: {off}");
+                report.AppendLine("== session ==");
+                report.AppendLine($"locked: {Native.IsSessionLocked()}");
+                report.AppendLine($"settings file: {Settings.DefaultPath}");
+                report.AppendLine($"screens: {System.Windows.Forms.Screen.AllScreens.Length}, scale of primary: {Native.ScaleOf(System.Windows.Forms.Screen.PrimaryScreen!)}");
+                File.WriteAllText(Path.Combine(folder, "host-report.txt"), report.ToString());
+                Console.WriteLine(report);
+                if (!on || !off) exit = 1;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("host smoke test failed: " + e);
+                File.WriteAllText(Path.Combine(folder, "host-report.txt"), "FAILED: " + e);
                 exit = 1;
             }
             app.Shutdown();

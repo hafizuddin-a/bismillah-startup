@@ -65,21 +65,29 @@ internal sealed class Updater
     }
 
     /// <summary>Checks (and installs) only if automatic updates are on and the last check was over a week ago.</summary>
-    public async void CheckIfDue()
+    public void CheckIfDue()
     {
         if (!_settings.UpdateAutomatically || _working) return;
         if (_settings.LastUpdateCheck is { } last && DateTime.Now - last < MinimumGap) return;
+        CheckNow(waitForQuietMoment: true);
+    }
+
+    /// <summary>The automatic path, right now (also used by the end-to-end update test).</summary>
+    public async void CheckNow(bool waitForQuietMoment = false)
+    {
+        if (_working) return;
         _working = true;
         try
         {
             _settings.LastUpdateCheck = DateTime.Now;
             _settings.Save();
             var release = await LatestReleaseAsync();
-            if (release is not null) await InstallAsync(release, waitForQuietMoment: true);
+            if (release is not null) await InstallAsync(release, waitForQuietMoment);
         }
-        catch (Exception)
+        catch (Exception e)
         {
             // quiet failure: it tries again next week
+            Log.Write("automatic update failed: " + e.Message);
         }
         finally { _working = false; }
     }

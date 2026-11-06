@@ -16,6 +16,7 @@ internal static class Program
         // CI helpers: draw frames to PNG files / put the real windows on screen, then exit
         if (args.Length >= 2 && args[0] == "--render-frames") return HeadlessRender.Run(args[1]);
         if (args.Length >= 2 && args[0] == "--smoke") return HeadlessRender.Smoke(args[1]);
+        if (args.Length >= 2 && args[0] == "--smoke-host") return HeadlessRender.SmokeHost(args[1]);
 
         // only one copy at a time (an update's relaunch waits a moment for the old copy to release this)
         _singleInstance = new Mutex(true, @"Local\Bismillah.SingleInstance", out bool first);

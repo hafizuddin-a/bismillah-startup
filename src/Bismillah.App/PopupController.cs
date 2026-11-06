@@ -68,7 +68,7 @@ internal sealed class PopupController
     public void Show(bool allScreens)
     {
         Close();
-        _reduceMotion = !SystemParameters.ClientAreaAnimation;
+        _reduceMotion = Motion.Reduce;
         _hideStart = null;
         _escapeWasDown = (Native.GetAsyncKeyState(Native.VK_ESCAPE) & 0x8000) != 0;
 

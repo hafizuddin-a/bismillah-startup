@@ -31,11 +31,23 @@ jobs:
 
       - name: Open the real popup windows and photograph the screen
         shell: pwsh
-        continue-on-error: true
         run: |
           $p = Start-Process -FilePath dist/publish/Bismillah.exe -ArgumentList '--smoke', "$PWD/out" -Wait -PassThru
           "exit code: $($p.ExitCode)"
           Get-ChildItem out | Format-Table Name, Length
+          if ($p.ExitCode -ne 0) { throw "popup smoke test failed" }
+
+      - name: Start the whole app (tray icon, wake monitor, scheduler) and read back its menu
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/publish/Bismillah.exe -ArgumentList '--smoke-host', "$PWD/out" -Wait -PassThru
+          "exit code: $($p.ExitCode)"
+          Get-Content out/host-report.txt
+          if ($p.ExitCode -ne 0) { throw "host smoke test failed" }
+
+      - name: Update test (a signed release is installed in place, a forged one is refused)
+        shell: pwsh
+        run: ./tools/ci/update-test.ps1
 
       - uses: actions/upload-artifact@v4
         if: always()
