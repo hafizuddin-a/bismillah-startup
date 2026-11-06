@@ -18,10 +18,17 @@ internal sealed class AppHost : IDisposable
     private readonly DispatcherTimer _dhikrTimer = new();
     private readonly Action _quit;
 
-    private bool _greetOnceUnlocked;
-    private DateTime _lastGreeting = DateTime.MinValue;
+    private readonly GreetGate _greet = new();
+    private readonly DispatcherTimer _greetTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
 
-    public AppHost(Action quit, bool afterUpdate)
+    // menu items that change with the settings, kept so the open menu can be updated in place
+    private readonly List<(int Count, Forms.ToolStripMenuItem Item)> _countItems = [];
+    private readonly List<(int Hour, Forms.ToolStripMenuItem Item)> _startItems = [], _endItems = [];
+    private Forms.ToolStripMenuItem _startParent = null!, _endParent = null!, _nextItem = null!;
+    private Forms.ToolStripMenuItem _loginItem = null!, _allScreensItem = null!, _autoUpdateItem = null!;
+    private bool _keepMenuOpen;
+
+    public AppHost(Action quit, bool afterUpdate, bool atLogin = false)
     {
         _quit = quit;
         _dhikr = new DhikrScheduler(_settings, ShowDhikrIfPossible);
@@ -41,7 +48,8 @@ internal sealed class AppHost : IDisposable
             if (e.Button == Forms.MouseButtons.Left)
                 typeof(Forms.NotifyIcon).GetMethod("ShowContextMenu", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.Invoke(_tray, null);
         };
-        _menu.Opening += (_, _) => RebuildMenu();
+        BuildMenu();
+        _menu.Opening += (_, _) => { _keepMenuOpen = false; RefreshMenu(); };
 
         _dhikr.WakeAt += due =>
         {
@@ -57,15 +65,20 @@ internal sealed class AppHost : IDisposable
             _dhikr.TimerFired();
         };
 
-        // After an automatic update the app reopens itself quietly; every other launch greets you.
-        if (!afterUpdate) _popup.Show(_settings.ShowOnAllScreens);
+        // After an automatic update the app reopens itself quietly. Opened by hand it greets you straight away; started
+        // at sign-in it waits for the desktop to be ready first (Windows starts these apps while it is still setting up).
+        _greetTimer.Tick += (_, _) => PollGreeting();
+        if (atLogin) Wake("signed in");
+        else if (!afterUpdate) ShowGreeting();
+        StartupRegistration.KeepCurrent();
         _updater.StartAutomaticChecks();
         _dhikr.Start();
         if (Environment.GetEnvironmentVariable("BISMILLAH_TEST_UPDATE_NOW") == "1") Later(1500, () => _updater.CheckNow());
 
         // Greet again whenever the PC wakes (lid opened, or the display woke up).
-        _wake.Woke += OnWoke;
-        _wake.Unlocked += () => Later(500, GreetIfPossible);
+        _wake.Woke += () => { Log.Write("wake signal"); OnWoke(); };
+        _wake.Locked += () => { Log.Write("session locked"); _greet.Locked(); };
+        _wake.Unlocked += () => Log.Write("session unlocked");
         _wake.Start();
     }
 
@@ -80,21 +93,35 @@ internal sealed class AppHost : IDisposable
 
     private void OnWoke()
     {
-        _greetOnceUnlocked = true;
-        Later(1000, GreetIfPossible);
+        Wake("woke");
         Later(60_000, _updater.CheckIfDue);       // the PC may have slept past an update check
         _dhikr.Start();                           // the clock may have jumped while it slept
     }
 
-    /// <summary>If the lid opens onto the lock screen, this waits for the unlock: a popup can't appear above it.</summary>
-    private void GreetIfPossible()
+    /// <summary>Waits for the lock screen to be gone (see <see cref="GreetGate"/>) and then writes the bismillah.</summary>
+    private void Wake(string why)
     {
-        if (!_greetOnceUnlocked || Native.IsSessionLocked()) return;
-        _greetOnceUnlocked = false;
-        // resume and display-on usually both fire; don't greet twice
-        if ((DateTime.Now - _lastGreeting).TotalSeconds <= 5) return;
-        _lastGreeting = DateTime.Now;
-        _popup.Show(_settings.ShowOnAllScreens);
+        _greet.Woke(DateTime.Now);
+        _greetTimer.Start();
+        Log.Write($"greeting pending ({why})");
+    }
+
+    private void PollGreeting()
+    {
+        bool locked = Native.IsSessionLocked();
+        if (_greet.ShouldGreet(DateTime.Now, locked, _wake.DisplayOn))
+        {
+            Log.Write("greeting now");
+            ShowGreeting(markGreeted: false);
+        }
+        if (!_greet.Pending) _greetTimer.Stop();
+    }
+
+    private void ShowGreeting(bool markGreeted = true)
+    {
+        if (markGreeted) _greet.Greeted(DateTime.Now);
+        try { _popup.Show(_settings.ShowOnAllScreens); }
+        catch (Exception e) { Log.Write("couldn't show the greeting: " + e); }
     }
 
     // MARK: dhikr
@@ -103,7 +130,8 @@ internal sealed class AppHost : IDisposable
     private bool ShowDhikrIfPossible()
     {
         if (_popup.IsShowing || _dhikrPopup.IsShowing || Native.IsSessionLocked() || !_wake.DisplayOn) return false;
-        _dhikrPopup.Show(_settings.ShowOnAllScreens);
+        try { _dhikrPopup.Show(_settings.ShowOnAllScreens); }
+        catch (Exception e) { Log.Write("couldn't show the dhikr: " + e); return false; }
         return true;
     }
 
@@ -115,59 +143,148 @@ internal sealed class AppHost : IDisposable
         return hour == 24 ? $"{text} (end of day)" : text;
     }
 
-    private void RebuildMenu()
+    /// <summary>A menu item that closes the menu when clicked, like any other.</summary>
+    private Forms.ToolStripMenuItem Plain(string text, Action action)
     {
-        _menu.Items.Clear();
-        _menu.Items.Add("Show Bismillah", null, (_, _) => { _lastGreeting = DateTime.Now; _popup.Show(_settings.ShowOnAllScreens); });
+        var item = new Forms.ToolStripMenuItem(text);
+        item.Click += (_, _) => { _keepMenuOpen = false; action(); };
+        return item;
+    }
+
+    /// <summary>A setting you may want to change several times: clicking it updates the ticks and leaves the menu open.</summary>
+    private Forms.ToolStripMenuItem Sticky(string text, Action action)
+    {
+        var item = new Forms.ToolStripMenuItem(text);
+        item.Click += (_, _) =>
+        {
+            _keepMenuOpen = true;
+            action();
+            RefreshMenu();
+        };
+        return item;
+    }
+
+    /// <summary>Stops a click on a sticky item from closing this menu or submenu.</summary>
+    private void KeepOpenWhenSticky(Forms.ToolStripDropDown dropDown) =>
+        dropDown.Closing += (_, e) =>
+        {
+            if (e.CloseReason == Forms.ToolStripDropDownCloseReason.ItemClicked && _keepMenuOpen) e.Cancel = true;
+        };
+
+    private void BuildMenu()
+    {
+        KeepOpenWhenSticky(_menu);
+        _menu.Items.Add(Plain("Show Bismillah", () => ShowGreeting()));
 
         var dhikr = new Forms.ToolStripMenuItem("Dhikr Reminders");
         foreach (int count in DhikrScheduler.Choices)
         {
             string title = count == 0 ? "Off" : count == 1 ? "1 per day" : $"{count} per day";
-            dhikr.DropDownItems.Add(new Forms.ToolStripMenuItem(title, null, (_, _) => _dhikr.PerDay = count) { Checked = _dhikr.PerDay == count });
+            var item = Sticky(title, () => _dhikr.PerDay = count);
+            _countItems.Add((count, item));
+            dhikr.DropDownItems.Add(item);
         }
         dhikr.DropDownItems.Add(new Forms.ToolStripSeparator());
-        var starts = new Forms.ToolStripMenuItem($"Starts at {HourLabel(_dhikr.StartHour)}");
+        _startParent = new Forms.ToolStripMenuItem();
         foreach (int hour in DhikrScheduler.StartHourChoices)
-            starts.DropDownItems.Add(new Forms.ToolStripMenuItem(HourLabel(hour), null, (_, _) => _dhikr.StartHour = hour)
-                { Checked = hour == _dhikr.StartHour, Enabled = hour < _dhikr.EndHour });
-        var ends = new Forms.ToolStripMenuItem($"Ends at {HourLabel(_dhikr.EndHour)}");
+        {
+            var item = Sticky(HourLabel(hour), () => _dhikr.StartHour = hour);
+            _startItems.Add((hour, item));
+            _startParent.DropDownItems.Add(item);
+        }
+        _endParent = new Forms.ToolStripMenuItem();
         foreach (int hour in DhikrScheduler.EndHourChoices)
-            ends.DropDownItems.Add(new Forms.ToolStripMenuItem(HourLabel(hour), null, (_, _) => _dhikr.EndHour = hour)
-                { Checked = hour == _dhikr.EndHour, Enabled = hour > _dhikr.StartHour });
-        dhikr.DropDownItems.Add(starts);
-        dhikr.DropDownItems.Add(ends);
+        {
+            var item = Sticky(HourLabel(hour), () => _dhikr.EndHour = hour);
+            _endItems.Add((hour, item));
+            _endParent.DropDownItems.Add(item);
+        }
+        dhikr.DropDownItems.Add(_startParent);
+        dhikr.DropDownItems.Add(_endParent);
         dhikr.DropDownItems.Add(new Forms.ToolStripSeparator());
-        string next;
-        if (_dhikr.NextPopup is { } due)
-            next = due.Date == DateTime.Today ? $"Next: {due:t}" : $"Next: tomorrow, {due:t}";
-        else next = "No reminders scheduled";
-        dhikr.DropDownItems.Add(new Forms.ToolStripMenuItem(next) { Enabled = false });
-        dhikr.DropDownItems.Add(new Forms.ToolStripMenuItem("Show Now", null, (_, _) => _dhikrPopup.Show(_settings.ShowOnAllScreens)));
+        _nextItem = new Forms.ToolStripMenuItem { Enabled = false };
+        dhikr.DropDownItems.Add(_nextItem);
+        dhikr.DropDownItems.Add(Plain("Show Now", () => _dhikrPopup.Show(_settings.ShowOnAllScreens)));
         _menu.Items.Add(dhikr);
 
+        // every submenu needs the same guard as the main menu
+        foreach (var menu in new[] { dhikr, _startParent, _endParent }) KeepOpenWhenSticky(menu.DropDown);
+
         _menu.Items.Add(new Forms.ToolStripSeparator());
-        _menu.Items.Add(new Forms.ToolStripMenuItem("Launch at Login", null, (_, _) => ToggleLaunchAtLogin()) { Checked = StartupRegistration.IsEnabled });
-        _menu.Items.Add(new Forms.ToolStripMenuItem("Show on All Screens", null, (_, _) => { _settings.ShowOnAllScreens = !_settings.ShowOnAllScreens; _settings.Save(); })
-            { Checked = _settings.ShowOnAllScreens });
-        _menu.Items.Add(new Forms.ToolStripMenuItem("Update Automatically", null, (_, _) =>
+        _loginItem = Sticky("Launch at Login", ToggleLaunchAtLogin);
+        _menu.Items.Add(_loginItem);
+        _allScreensItem = Sticky("Show on All Screens", () => { _settings.ShowOnAllScreens = !_settings.ShowOnAllScreens; _settings.Save(); });
+        _menu.Items.Add(_allScreensItem);
+        _autoUpdateItem = Sticky("Update Automatically", () =>
         {
             _settings.UpdateAutomatically = !_settings.UpdateAutomatically;
             _settings.Save();
             if (_settings.UpdateAutomatically) _updater.CheckIfDue();
-        }) { Checked = _settings.UpdateAutomatically });
-        _menu.Items.Add("Check for Updates…", null, (_, _) => _updater.CheckManually());
+        });
+        _menu.Items.Add(_autoUpdateItem);
+        _menu.Items.Add(Plain("Check for Updates…", () => _updater.CheckManually()));
         _menu.Items.Add(new Forms.ToolStripMenuItem($"Version {Updater.CurrentVersion}") { Enabled = false });
         _menu.Items.Add(new Forms.ToolStripSeparator());
-        _menu.Items.Add("Quit Bismillah", null, (_, _) => _quit());
-        _menu.Items.Add("Sincerely, @madebyhafiz", null, (_, _) =>
-            Process.Start(new ProcessStartInfo("https://www.instagram.com/madebyhafiz/") { UseShellExecute = true }));
+        _menu.Items.Add(Plain("Quit Bismillah", () => _quit()));
+        _menu.Items.Add(Plain("Sincerely, @madebyhafiz", () =>
+            Process.Start(new ProcessStartInfo("https://www.instagram.com/madebyhafiz/") { UseShellExecute = true })));
+        RefreshMenu();
+    }
+
+    /// <summary>Brings every tick, greyed-out entry and label up to date with the settings, without rebuilding the menu.</summary>
+    private void RefreshMenu()
+    {
+        foreach (var (count, item) in _countItems) item.Checked = _dhikr.PerDay == count;
+        _startParent.Text = $"Starts at {HourLabel(_dhikr.StartHour)}";
+        _endParent.Text = $"Ends at {HourLabel(_dhikr.EndHour)}";
+        foreach (var (hour, item) in _startItems) { item.Checked = hour == _dhikr.StartHour; item.Enabled = hour < _dhikr.EndHour; }
+        foreach (var (hour, item) in _endItems) { item.Checked = hour == _dhikr.EndHour; item.Enabled = hour > _dhikr.StartHour; }
+        _nextItem.Text = _dhikr.NextPopup is { } due
+            ? (due.Date == DateTime.Today ? $"Next: {due:t}" : $"Next: tomorrow, {due:t}")
+            : "No reminders scheduled";
+        _loginItem.Checked = StartupRegistration.IsEnabled;
+        _allScreensItem.Checked = _settings.ShowOnAllScreens;
+        _autoUpdateItem.Checked = _settings.UpdateAutomatically;
+    }
+
+    /// <summary>
+    /// CI check that sticky items keep the menu open while ordinary ones close it. Opens the real menu, clicks a probe
+    /// item (should close it) and then "Show on All Screens" (should not).
+    /// </summary>
+    public async Task<(bool Conclusive, bool Ok, string Report)> TestMenuStaysOpen()
+    {
+        var probe = Plain("probe", () => { });
+        _menu.Items.Add(probe);
+        try
+        {
+            _menu.Show(new System.Drawing.Point(60, 60));
+            await Task.Delay(400);
+            bool shown = _menu.Visible;
+            probe.PerformClick();
+            await Task.Delay(400);
+            bool plainClosed = !_menu.Visible;
+
+            bool before = _settings.ShowOnAllScreens;
+            _menu.Show(new System.Drawing.Point(60, 60));
+            await Task.Delay(400);
+            _allScreensItem.PerformClick();
+            await Task.Delay(400);
+            bool stickyOpen = _menu.Visible;
+            bool ticked = _allScreensItem.Checked != before;
+            _allScreensItem.PerformClick();                       // put the setting back
+            await Task.Delay(200);
+            _menu.Close();
+
+            string report = $"menu shown: {shown}; ordinary click closed it: {plainClosed}; sticky click left it open: {stickyOpen}; tick followed the setting: {ticked}";
+            return (shown && plainClosed, stickyOpen && ticked, report);
+        }
+        finally { _menu.Items.Remove(probe); }
     }
 
     /// <summary>The menu as indented text, for the CI smoke test.</summary>
     public string DescribeMenu()
     {
-        RebuildMenu();
+        RefreshMenu();
         var text = new System.Text.StringBuilder();
         void Walk(Forms.ToolStripItemCollection items, int depth)
         {

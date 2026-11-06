@@ -11,7 +11,9 @@ internal static class ScreenPlacement
     public static IReadOnlyList<Forms.Screen> Targets(bool allScreens)
     {
         if (allScreens && Forms.Screen.AllScreens.Length > 0) return Forms.Screen.AllScreens;
-        return [Forms.Screen.FromPoint(Forms.Cursor.Position)];
+        // the cursor position can't be read while Windows is still switching desktops at sign-in; use the main screen then
+        try { return [Forms.Screen.FromPoint(Forms.Cursor.Position)]; }
+        catch (Exception e) { Log.Write("cursor position unavailable: " + e.Message); return [Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0]]; }
     }
 
     /// <summary>A window that is never activated, stays above other windows, and has no taskbar button.</summary>

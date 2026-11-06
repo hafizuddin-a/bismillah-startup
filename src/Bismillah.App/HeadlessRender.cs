@@ -160,6 +160,9 @@ internal static class HeadlessRender
                 bool on = StartupRegistration.IsEnabled;
                 StartupRegistration.Set(false);
                 bool off = !StartupRegistration.IsEnabled;
+                var (conclusive, stickyOk, menuReport) = await host.TestMenuStaysOpen();
+                report.AppendLine("== menu stays open ==");
+                report.AppendLine(menuReport + (conclusive ? "" : " (inconclusive: PerformClick does not dismiss a menu here)"));
                 report.AppendLine("== launch at login ==");
                 report.AppendLine($"turned on: {on}, turned off: {off}");
                 report.AppendLine("== session ==");
@@ -168,7 +171,7 @@ internal static class HeadlessRender
                 report.AppendLine($"screens: {System.Windows.Forms.Screen.AllScreens.Length}, scale of primary: {Native.ScaleOf(System.Windows.Forms.Screen.PrimaryScreen!)}");
                 File.WriteAllText(Path.Combine(folder, "host-report.txt"), report.ToString());
                 Console.WriteLine(report);
-                if (!on || !off) exit = 1;
+                if (!on || !off || (conclusive && !stickyOk)) exit = 1;
             }
             catch (Exception e)
             {

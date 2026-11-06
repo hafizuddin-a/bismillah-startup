@@ -17,6 +17,8 @@ internal sealed class WakeMonitor : IDisposable
 
     /// <summary>The PC woke up, or its display came back on.</summary>
     public event Action? Woke;
+    /// <summary>The lock screen came up.</summary>
+    public event Action? Locked;
     /// <summary>The user signed back in after the lock screen.</summary>
     public event Action? Unlocked;
 
@@ -43,6 +45,8 @@ internal sealed class WakeMonitor : IDisposable
 
     private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
     {
+        if (e.Reason is SessionSwitchReason.SessionLock or SessionSwitchReason.ConsoleDisconnect or SessionSwitchReason.RemoteDisconnect)
+            Locked?.Invoke();
         if (e.Reason is SessionSwitchReason.SessionUnlock or SessionSwitchReason.SessionLogon or SessionSwitchReason.RemoteConnect or SessionSwitchReason.ConsoleConnect)
             Unlocked?.Invoke();
     }

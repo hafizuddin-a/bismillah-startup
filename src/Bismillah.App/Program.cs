@@ -24,9 +24,14 @@ internal static class Program
         if (!first && !args.Contains("--after-update")) return 0;
         if (!first) { _singleInstance.Dispose(); _singleInstance = new Mutex(true, @"Local\Bismillah.SingleInstance", out first); if (!first) return 0; }
 
+        Log.Write($"started {Updater.CurrentVersion} ({string.Join(' ', args)}) from {Environment.ProcessPath}");
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("crashed: " + e.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, e) => { Log.Write("background task failed: " + e.Exception); e.SetObserved(); };
+
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        app.DispatcherUnhandledException += (_, e) => { Log.Write("error: " + e.Exception); e.Handled = true; };      // keep running; the log says why
         AppHost? host = null;
-        app.Startup += (_, _) => host = new AppHost(() => app.Dispatcher.BeginInvoke(() => app.Shutdown()), args.Contains("--after-update"));
+        app.Startup += (_, _) => host = new AppHost(() => app.Dispatcher.BeginInvoke(() => app.Shutdown()), args.Contains("--after-update"), args.Contains("--login"));
         app.Exit += (_, _) => host?.Dispose();
         return app.Run();
     }

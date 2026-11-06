@@ -17,10 +17,24 @@ internal static class StartupRegistration
         }
     }
 
+    /// <summary>The command Windows runs at sign-in. --login tells the app it was started that way.</summary>
+    private static string Command => $"\"{Environment.ProcessPath}\" --login";
+
     public static void Set(bool enabled)
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-        if (enabled) key.SetValue(ValueName, $"\"{Environment.ProcessPath}\"");
+        if (enabled) key.SetValue(ValueName, Command);
         else key.DeleteValue(ValueName, throwOnMissingValue: false);
+    }
+
+    /// <summary>If Launch at Login is on, makes sure it points at this exe in the current form (an older version wrote it without --login).</summary>
+    public static void KeepCurrent()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+            if (key?.GetValue(ValueName) is string current && current != Command) key.SetValue(ValueName, Command);
+        }
+        catch (Exception e) { Log.Write("couldn't refresh Launch at Login: " + e.Message); }
     }
 }
